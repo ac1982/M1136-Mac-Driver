@@ -6,6 +6,7 @@
 #endif
 #include "raster_input.h"
 #include "m1136.h"
+#include "io.h"
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
@@ -17,8 +18,7 @@ _Static_assert(sizeof(cups_page_header2_t)==1796, "CUPS v3 wire header changed")
 static ssize_t read_fd(m1136_raster *r, unsigned char *data, size_t n)
 {
     if(*r->cancelled) { r->failed=1; return -1; }
-    ssize_t count;
-    do { count=read(r->fd,data,n); } while(count<0 && errno==EINTR && !*r->cancelled);
+    ssize_t count=m1136_io(r->fd,data,n,0,r->cancelled);
     if(count<0 || *r->cancelled) { r->failed=1; return -1; }
     return count;
 }

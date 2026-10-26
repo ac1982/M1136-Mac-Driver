@@ -1,0 +1,85 @@
+name: Signed release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release tag and source
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          test "$RELEASE_TAG" = "v$(cat VERSION)"
+          git merge-base --is-ancestor HEAD origin/main
+          test -z "$(git status --porcelain)"
+          sw_vers
+          uname -m
+      - name: Address and undefined behavior sanitizers
+        run: |
+          cmake -S . -B build-sanitize -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_OSX_ARCHITECTURES=arm64 -DM1136_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build-sanitize --parallel 4
+          ctest --test-dir build-sanitize --output-on-failure
+      - name: Prepare temporary signing keychain
+        env:
+          APPLE_APPLICATION_P12_BASE64: ${{ secrets.APPLE_APPLICATION_P12_BASE64 }}
+          APPLE_INSTALLER_P12_BASE64: ${{ secrets.APPLE_INSTALLER_P12_BASE64 }}
+          APPLE_P12_PASSWORD: ${{ secrets.APPLE_P12_PASSWORD }}
+          APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: python3 scripts/ci-signing.py prepare
+      - name: Build and test Pulse-signed filter
+        run: sh scripts/build-macos.sh --developer-id
+      - name: Sign, notarize and staple installer
+        run: python3 scripts/package-signed-macos.py --notarize
+      - name: Verify release assets
+        run: python3 scripts/verify-release.py
+      - name: Clean signing credentials
+        if: always()
+        run: python3 scripts/ci-signing.py cleanup
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signed-release
+          path: |
+            build-package/*.pkg
+            build-package/*.pkg.sha256
+            build-package/M1136-Mac-Driver-source.tar.gz
+            build-package/M1136-Mac-Driver-release.json
+            build-package/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: signed-release
+          path: build-release
+      - name: Verify downloaded assets
+        run: python3 scripts/verify-release.py build-release
+      - name: Publish accepted release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" build-release/* --verify-tag --draft --title "M1136 Mac Driver $RELEASE_TAG" --notes-file "docs/RELEASE-${RELEASE_TAG#v}.md"
+          gh release edit "$RELEASE_TAG" --draft=false --latest

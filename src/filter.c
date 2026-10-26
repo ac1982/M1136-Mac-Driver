@@ -6,6 +6,7 @@
 #endif
 #include "m1136.h"
 #include "raster_input.h"
+#include "io.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -24,7 +25,7 @@ static int write_output(void *unused, const void *data, size_t size)
     (void)unused;
     const unsigned char *p = data;
     while (size && !cancelled) {
-        ssize_t n = write(STDOUT_FILENO, p, size);
+        ssize_t n = m1136_io(STDOUT_FILENO, (void *)p, size, 1, &cancelled);
         if (n < 0 && errno == EINTR) continue;
         if (n <= 0) return -1;
         p += (size_t)n; size -= (size_t)n;
@@ -46,6 +47,7 @@ int main(int argc, char **argv)
 {
     const char *error=NULL;
     int status=1, fd=STDIN_FILENO;
+    int input_flags=-1, output_flags=-1;
     unsigned copies;
     m1136_raster raster={0};
     m1136_page page={0}; m1136_job job={0};
@@ -69,6 +71,13 @@ int main(int argc, char **argv)
         if(fd<0 || fstat(fd,&st) || !S_ISREG(st.st_mode)) {
             error="Input must be a regular non-symlink spool file"; goto done;
         }
+    }
+    input_flags=fcntl(fd,F_GETFL);
+    output_flags=fcntl(STDOUT_FILENO,F_GETFL);
+    if(input_flags<0 || output_flags<0 ||
+       fcntl(fd,F_SETFL,input_flags|O_NONBLOCK)<0 ||
+       fcntl(STDOUT_FILENO,F_SETFL,output_flags|O_NONBLOCK)<0) {
+        error="Cannot configure cancellable I/O"; goto done;
     }
     if(m1136_raster_open(&raster,fd,&cancelled)) { error=raster.error; goto done; }
     cups_page_header2_t header;
@@ -113,6 +122,8 @@ int main(int argc, char **argv)
 done:
     m1136_page_destroy(&page);
     m1136_raster_close(&raster);
+    if(input_flags>=0) (void)fcntl(fd,F_SETFL,input_flags);
+    if(output_flags>=0) (void)fcntl(STDOUT_FILENO,F_SETFL,output_flags);
     if(fd>=0 && fd!=STDIN_FILENO) close(fd);
     if(error) fprintf(stderr,"ERROR: %s\n",error);
     return status;

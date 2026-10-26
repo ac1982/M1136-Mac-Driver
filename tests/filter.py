@@ -83,6 +83,26 @@ with tempfile.TemporaryDirectory() as d:
     p.stdin.close()
     assert p.returncode==1,p.returncode
     p.stdout.close();p.stderr.close()
+    # A live but non-draining output consumer must not prevent cancellation.
+    read_fd,write_fd=os.pipe()
+    import fcntl
+    original_flags=fcntl.fcntl(write_fd,fcntl.F_GETFL)
+    fcntl.fcntl(write_fd,fcntl.F_SETFL,original_flags|os.O_NONBLOCK)
+    try:
+        while True: os.write(write_fd,b'x'*4096)
+    except BlockingIOError:
+        pass
+    fcntl.fcntl(write_fd,fcntl.F_SETFL,original_flags)
+    original_flags=fcntl.fcntl(write_fd,fcntl.F_GETFL)
+    p=subprocess.Popen([binary,'1','u','t','1','',str(path)],stdout=write_fd,stderr=subprocess.PIPE)
+    try:
+        time.sleep(.1);p.send_signal(signal.SIGTERM)
+        p.wait(timeout=5)
+        assert p.returncode==1,p.returncode
+        assert fcntl.fcntl(write_fd,fcntl.F_GETFL)==original_flags
+    finally:
+        if p.poll() is None: p.kill();p.wait()
+        os.close(read_fd);os.close(write_fd);p.stderr.close()
 randomizer=random.Random(1136)
 for _ in range(60):
     # Invalid magic: ensure fast rejection without trusting random size fields.
