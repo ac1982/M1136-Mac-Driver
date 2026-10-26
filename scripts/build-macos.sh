@@ -11,7 +11,7 @@ cmake -S "$root" -B "$build" -DCMAKE_C_COMPILER=/usr/bin/clang \
 cmake --build "$build" --parallel 4
 ctest --test-dir "$build" --output-on-failure
 python3 "$root/scripts/check-binary.py" "$build/rastertom1136"
-/usr/bin/lipo -verify_arch arm64 "$build/rastertom1136"
+/usr/bin/lipo "$build/rastertom1136" -verify_arch arm64
 /usr/bin/otool -L "$build/rastertom1136"
 /usr/bin/codesign --force --sign - "$build/rastertom1136"
 /usr/bin/codesign --verify --strict "$build/rastertom1136"

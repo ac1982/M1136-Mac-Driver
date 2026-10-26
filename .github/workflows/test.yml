@@ -25,3 +25,11 @@ jobs:
           cmake -S . -B build-sanitize -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_OSX_ARCHITECTURES=arm64 -DM1136_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build build-sanitize --parallel 4
           ctest --test-dir build-sanitize --output-on-failure
+      - name: Package verified release build
+        run: python3 scripts/package-macos.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: M1136-Mac-Driver-arm64
+          path: build-package/M1136-Mac-Driver-arm64.tar.gz
+          if-no-files-found: error
+          retention-days: 30
