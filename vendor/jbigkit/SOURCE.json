@@ -1,0 +1,15 @@
+{
+  "version": "2.2",
+  "url": "https://www.cl.cam.ac.uk/~mgk25/jbigkit/download/jbigkit-2.2.tar.gz",
+  "archive_sha256": "3302109c93b7befbffa3cfe8bceb4355f19dea0ee7dcb5f33710b1648bf6645c",
+  "files": {
+    "CHANGES": "84662ecc89d5d34b0b478b7e314354b696ff033addb7254b60c4055ca1941a4e",
+    "COPYING": "91df39d1816bfb17a4dda2d3d2c83b1f6f2d38d53e53e41e8f97ad5ac46a0cad",
+    "jbig.c": "74f308fd5fa8c664cf1b377fae18d30e7f5eabcd3c686b0d62e01f6046f63f00",
+    "jbig.h": "4a8b2d69757ba0774119cd8894d87c2fe595aeee9abbf5878a0c61ad12b8ec32",
+    "jbig.txt": "b4e55bdf25a25c78229ca780e25192b5159e7b8243e678b419331074e92b2a97",
+    "jbig_ar.c": "730fba898bbd24a0874ed0b426e4226d4a52ba35d43d3574b7c8b7f7a612e0ef",
+    "jbig_ar.h": "c9f31dcc191620ad13302679d466a8941dd3ee75a1641a53600b34fd4e6d3039",
+    "tstcodec.c": "04f8a2f3c0a3011331af6a5796c45348ef28f3c39a5c8283cacca3bcd292552b"
+  }
+}
