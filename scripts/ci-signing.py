@@ -2,9 +2,11 @@
 """Prepare/clean an isolated Actions signing keychain. Never log credentials."""
 import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -26,6 +28,10 @@ def main():
     directory = Path(os.environ['RUNNER_TEMP']) / 'm1136-signing'
     keychain = directory / 'release.keychain-db'
     if sys.argv[1] == 'cleanup':
+        saved_search = directory / 'original-search-list.json'
+        if saved_search.exists():
+            run(['security', 'list-keychains', '-d', 'user', '-s',
+                 *json.loads(saved_search.read_text())], 'Restore runner keychain search list')
         if keychain.exists():
             run(['security', 'delete-keychain', str(keychain)], 'Delete temporary keychain')
         if directory.exists():
@@ -42,10 +48,16 @@ def main():
     directory.mkdir(mode=0o700)
     with open(os.environ['GITHUB_ENV'], 'a') as env:
         env.write(f'M1136_SIGNING_KEYCHAIN={keychain}\nM1136_NOTARY_PROFILE=pulse-notary\n')
+    original_search = shlex.split(subprocess.check_output(['security', 'list-keychains', '-d', 'user'], text=True))
+    (directory / 'original-search-list.json').write_text(json.dumps(original_search))
     password = secrets.token_urlsafe(40)
     run(['security', 'create-keychain', '-p', password, str(keychain)], 'Create temporary keychain')
     run(['security', 'unlock-keychain', '-p', password, str(keychain)], 'Unlock temporary keychain')
     run(['security', 'set-keychain-settings', '-lut', '7200', str(keychain)], 'Set keychain lifetime')
+    # codesign's chain discovery also uses the user search list on fresh runners.
+    # This is runner-local, and cleanup restores the exact previous list.
+    run(['security', 'list-keychains', '-d', 'user', '-s', str(keychain), *original_search],
+        'Add temporary keychain to runner search list')
     # These P12 backups contain leaf certificates only. Fresh runners need
     # the matching Apple intermediate; importing it does not override trust.
     certificate = directory / 'DeveloperIDCA.cer'
@@ -72,7 +84,18 @@ def main():
     for fingerprint in [b'DFDB23B57B981768E409295A450B830831AC8117', b'527D671237915C637E479669553F95E48A21F984']:
         if fingerprint not in identities:
             raise ValueError('Expected Pulse signing identity is not valid in the temporary keychain')
-    run(['xcrun', 'notarytool', 'store-credentials' , 'pulse-notary', '--keychain', str(keychain),
+    code_identities = run(['security', 'find-identity', '-v', '-p', 'codesigning', str(keychain)], 'Validate code-signing policy')
+    if b'DFDB23B57B981768E409295A450B830831AC8117' not in code_identities:
+        raise ValueError('Pulse Application identity does not satisfy code-signing policy')
+    probe = directory / 'signing-probe'
+    (directory / 'probe.c').write_text('int main(void) { return 0; }\n')
+    run(['/usr/bin/clang', str(directory / 'probe.c'), '-o', str(probe)], 'Compile signing probe')
+    run(['/usr/bin/codesign', '--force', '--sign', 'DFDB23B57B981768E409295A450B830831AC8117',
+         '--keychain', str(keychain), '--options', 'runtime', '--timestamp', str(probe)], 'Sign probe on clean runner')
+    run(['/usr/bin/codesign', '--verify', '--strict', str(probe)], 'Verify signing probe')
+    probe.unlink()
+    (directory / 'probe.c').unlink()
+    run(['xcrun', 'notarytool', 'store-credentials'  , 'pulse-notary', '--keychain', str(keychain),
          '--key', str(directory / 'notary.p8'), '--key-id', os.environ['APPLE_NOTARY_KEY_ID'],
          '--issuer', os.environ['APPLE_NOTARY_ISSUER_ID']], 'Validate notary credentials')
     for name in ['application.p12', 'installer.p12', 'notary.p8']:
