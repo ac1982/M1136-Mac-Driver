@@ -1,6 +1,6 @@
 # M1136 Mac Driver
 
-当前稳定版为 1.0.0；本开发分支为 1.1.0 测试版，新增手动双面，已通过本机 A4 长边双面验收，未发布。
+当前版本为 **1.1.0**，新增手动双面，已通过本机 A4 长边双面验收。正式安装包由 GitHub Actions 从发布标签构建、签名和公证。
 
 为 **HP LaserJet Professional M1136 MFP** 提供原生 Apple Silicon USB 打印支持。
 无需 Rosetta，不增加网络打印服务。驱动使用系统 CUPS，业务代码为 C，压缩使用 JBIG-KIT 2.2。
@@ -13,7 +13,7 @@
 ## 下载与安装
 
 从 [Releases](https://github.com/ac1982/M1136-Mac-Driver/releases/latest) 下载
-`M1136-Mac-Driver-1.0.0-arm64.pkg`。正式发布包由 **Pulse**（Team ID `89G3DBC6CS`）
+`M1136-Mac-Driver-1.1.0-arm64.pkg`。正式发布包由 **Pulse**（Team ID `89G3DBC6CS`）
 进行 Developer ID 签名，经过 Apple 公证并装订票据；发布附件包含校验和、构建记录和对应源码。
 
 1. 连接打印机并放入 A4 纸，双击 `.pkg`，按 macOS 提示授权安装。
@@ -47,17 +47,17 @@ sudo lpadmin -p HP_M1136_Native_C -P /Library/Printers/M1136MacDriver/M1136.ppd
 | 份数 | 1–99 份，使用每页 raster NumCopies，避免逐份打印重复乘份数 |
 | 页数 | 每个任务最多 500 个输入 raster 页面 |
 | 自动双面 | 不支持，双面输入会被拒绝 |
-| 驱动辅助的手动双面 | 开发分支支持长边/短边、H1 暂停与整叠回放；每次 1 份，最多 200 页/100 张；A4 四页长边已实测 |
+| 驱动辅助的手动双面 | 支持长边/短边、H1 暂停与整叠回放；每次 1 份，最多 200 页/100 张；A4 四页长边已实测 |
 | 扫描 | 不在项目范围内 |
 
 A4 基本打印和三份数量已实测；Letter 实物打印、多页逐份排序、取消后恢复、USB 拔插和断电恢复仍待验证。
 PPD 设置 12pt 可打印边界，当前打印效果已获用户确认，但不是全设备范围的精密边距校准。
 
-## 手动双面（开发分支）
+## 手动双面
 
 选择打印窗口中的 **Manual Duplex (1 copy; reload at H1)**，选择长边或短边装订。
 这是打印机功能选项；系统的自动“双面”选项仍不支持。操作步骤、来源和测试状态见
-[手动双面说明](docs/MANUAL-DUPLEX.zh-CN.md)。稳定版 1.0.0 不含此功能。
+[手动双面说明](docs/MANUAL-DUPLEX.zh-CN.md)。此功能从 1.1.0 开始提供。
 
 ## 构建与测试
 

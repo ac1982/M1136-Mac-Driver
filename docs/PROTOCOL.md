@@ -31,7 +31,7 @@ JBIG 使用单平面、L0=128、MX=MY=0；MX=0 是已知 M1136 兼容参数。
 同时用于 XQX COPIES 和 CUPS `PAGE:` 计数。命令行份数仍校验，但不再重复施加：
 Apple renderer 可能已把逐份任务展开为多页，每个页头 NumCopies=1。
 
-## 手动双面（开发分支）
+## 手动双面（1.1.0 起）
 
 参考同一固定版本 foo2xqx.c 的 start_doc、start_page 和末尾手动双面分支，独立实现：
 文档 item `0x10000002=2`；页面添加 `0x20000012`，item 数从 15 变为 16，

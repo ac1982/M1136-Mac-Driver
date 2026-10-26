@@ -39,7 +39,7 @@ python3 scripts/package-signed-macos.py --notarize
 请将 `M1136-Mac-Driver-source.tar.gz` 与二进制一起分发，以提供对应源码。
 `.tar.gz` 开发安装包本身不能装订公证票据；对外安装优先使用已装订的 `.pkg`。
 
-双击 `M1136-Mac-Driver-1.0.0-arm64.pkg` 安装。它仅安装或更新本项目的两个驱动文件，
+双击 `M1136-Mac-Driver-1.1.0-arm64.pkg` 安装。它仅安装或更新本项目的两个驱动文件，
 不创建队列、不改变默认打印机、不自动打印；已有 `HP_M1136_Native_C` 队列会继续使用同一路径。
 安装更新前请确保该队列没有正在打印的任务。
 CUPS 保留独立的队列 PPD 副本；已有队列更新后，用以下命令刷新其版本和能力：
@@ -98,7 +98,7 @@ lpstat -p HP_M1136_Native_C
 
 当前输出按页携带份数；逐份排序由上游 CUPS 排版处理，需实机验证。
 单面支持 600dpi、A4/Letter、1–99 份、最多 500 个输入页面。
-开发分支另有[手动双面](MANUAL-DUPLEX.zh-CN.md)，每次 1 份、最多 200 页；1.0.0 稳定版不包含。
+1.1.0 起支持[手动双面](MANUAL-DUPLEX.zh-CN.md)，每次 1 份、最多 200 页。
 拒绝压缩 CUPS raster 容器；Apple PDF 流程使用未压缩 raster，打印机端仍为 JBIG。
 
 ## 回滚
