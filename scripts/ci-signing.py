@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Prepare/clean an isolated Actions signing keychain. Never log credentials."""
 import base64
+import hashlib
 import os
 from pathlib import Path
 import secrets
 import shutil
 import subprocess
 import sys
+import urllib.request
 
 
 def run(command, label):
@@ -15,6 +17,7 @@ def run(command, label):
         # CalledProcessError would expose password-bearing command arguments.
         raise RuntimeError(f'{label} failed (exit {result.returncode})')
     print(label + ' OK', flush=True)
+    return result.stdout
 
 
 def main():
@@ -43,7 +46,16 @@ def main():
     run(['security', 'create-keychain', '-p', password, str(keychain)], 'Create temporary keychain')
     run(['security', 'unlock-keychain', '-p', password, str(keychain)], 'Unlock temporary keychain')
     run(['security', 'set-keychain-settings', '-lut', '7200', str(keychain)], 'Set keychain lifetime')
-    for name, secret in [('application.p12', 'APPLE_APPLICATION_P12_BASE64'),
+    # These P12 backups contain leaf certificates only. Fresh runners need
+    # the matching Apple intermediate; importing it does not override trust.
+    certificate = directory / 'DeveloperIDCA.cer'
+    with urllib.request.urlopen('https://www.apple.com/certificateauthority/DeveloperIDCA.cer', timeout=30) as response:
+        data = response.read()
+    if hashlib.sha256(data).hexdigest() != '7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f':
+        raise ValueError('Unexpected Apple Developer ID G1 intermediate certificate')
+    certificate.write_bytes(data)
+    run(['security', 'import', str(certificate), '-k', str(keychain), '-t', 'cert'], 'Import pinned Apple intermediate')
+    for name, secret in [('application.p12' , 'APPLE_APPLICATION_P12_BASE64'),
                          ('installer.p12', 'APPLE_INSTALLER_P12_BASE64'),
                          ('notary.p8', 'APPLE_NOTARY_KEY_BASE64')]:
         path = directory / name
@@ -56,7 +68,11 @@ def main():
              '-T', '/usr/bin/pkgbuild', '-T', '/usr/bin/productsign'], 'Import ' + name)
     run(['security', 'set-key-partition-list', '-S', 'apple-tool:,apple:', '-s', '-k',
          password, str(keychain)], 'Configure Apple signing tools')
-    run(['xcrun', 'notarytool', 'store-credentials', 'pulse-notary', '--keychain', str(keychain),
+    identities = run(['security', 'find-identity', '-v', str(keychain)], 'Validate signing identities')
+    for fingerprint in [b'DFDB23B57B981768E409295A450B830831AC8117', b'527D671237915C637E479669553F95E48A21F984']:
+        if fingerprint not in identities:
+            raise ValueError('Expected Pulse signing identity is not valid in the temporary keychain')
+    run(['xcrun', 'notarytool', 'store-credentials' , 'pulse-notary', '--keychain', str(keychain),
          '--key', str(directory / 'notary.p8'), '--key-id', os.environ['APPLE_NOTARY_KEY_ID'],
          '--issuer', os.environ['APPLE_NOTARY_ISSUER_ID']], 'Validate notary credentials')
     for name in ['application.p12', 'installer.p12', 'notary.p8']:

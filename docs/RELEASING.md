@@ -14,6 +14,7 @@
 | `APPLE_NOTARY_ISSUER_ID` | API Issuer ID |
 
 Secrets 通过 GitHub 加密存储，不写入仓库、命令输出、artifact 或源码归档。
+CI 从 Apple 官方源获取匹配的 Developer ID G1 中间证书并核对固定 SHA-256，再导入临时钥匙串；不修改系统信任设置。
 签名任务只有 contents:read；发布任务独立授予 contents:write，且不接收 Apple 私钥。
 CI helper 在 runner 临时目录创建钥匙串，导入后删除 P12/P8 临时文件，always 步骤清理钥匙串。
 不要使用 pull_request_target 执行不可信 PR 代码并传入这些 Secrets。
