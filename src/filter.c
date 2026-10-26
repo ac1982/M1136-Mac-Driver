@@ -7,6 +7,8 @@
 #include "m1136.h"
 #include "raster_input.h"
 #include "io.h"
+#include "duplex.h"
+#include "internal.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -50,6 +52,7 @@ int main(int argc, char **argv)
     int input_flags=-1, output_flags=-1;
     unsigned copies;
     m1136_raster raster={0};
+    m1136_duplex duplex={.fd=-1,.cancelled=&cancelled};
     m1136_page page={0}; m1136_job job={0};
     unsigned char row[8192];
     struct rlimit core={0,0};
@@ -64,6 +67,17 @@ int main(int argc, char **argv)
     if((argc!=6 && argc!=7) || copies_arg(argv[4],&copies)) {
         error="Expected CUPS arguments and copy count 1..99"; goto done;
     }
+    cups_option_t *options=NULL;
+    int count=cupsParseOptions(argv[5],0,&options);
+    const char *mode=cupsGetOption("M1136ManualDuplex",count,options);
+    if(mode && strcmp(mode,"Off")) {
+        if(!strcmp(mode,"LongEdge")) duplex.mode=1;
+        else if(!strcmp(mode,"ShortEdge")) duplex.mode=2;
+        else error="Invalid manual duplex mode";
+    }
+    cupsFreeOptions(count,options);
+    if(error) goto done;
+    if(duplex.mode && copies!=1) { error="Manual duplex requires one copy per job"; goto done; }
     /* Titles, usernames and arbitrary option strings never enter PJL or a shell. */
     if(argc==7) {
         fd=open(argv[6],O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK);
@@ -86,6 +100,9 @@ int main(int argc, char **argv)
         int next=m1136_raster_next(&raster,&header,&paper);
         if(next<0) {error=raster.error;goto done;}
         if(!next) break;
+        if(duplex.mode && (header.NumCopies!=1 || duplex.count>=M1136_DUPLEX_PAGES)) {
+            error="Manual duplex requires one copy and at most 200 pages"; goto done;
+        }
         if(job.pages>=M1136_MAX_PAGES) { error="Job exceeds 500 pages"; goto done; }
         m1136_result result=m1136_page_create(&page,header.cupsWidth,header.cupsHeight);
         if(result) { error=m1136_error(result); goto done; }
@@ -96,6 +113,13 @@ int main(int argc, char **argv)
             }
             result=m1136_page_row(&page,y,row,header.cupsBytesPerLine);
             if(result) { error=m1136_error(result); goto done; }
+        }
+        if(duplex.mode) {
+            if(m1136_duplex_add(&duplex,&page,paper)) {
+                error="Cannot spool manual duplex: inconsistent page size, cancellation, or 512 MiB disk limit/I/O failure"; goto done;
+            }
+            m1136_page_destroy(&page);
+            continue;
         }
         if(!job.active) {
             time_t now=time(NULL); struct tm local;
@@ -113,13 +137,31 @@ int main(int argc, char **argv)
         m1136_page_destroy(&page);
     }
     if(cancelled) { error="Job cancelled"; goto done; }
-    if(!job.pages) { error="Empty or invalid raster stream"; goto done; }
+    if(!job.pages && !duplex.count) { error="Empty or invalid raster stream"; goto done; }
     const char *detail=cupsRasterErrorString();
     if(detail && *detail) { error="Malformed raster stream"; goto done; }
+    if(duplex.mode) {
+        /* Blank back keeps an odd final page in the same stack and sheet order. */
+        if(duplex.count&1) {
+            m1136_saved_page *last=&duplex.pages[duplex.count-1];
+            if(m1136_page_create(&page,last->shape.width,last->shape.height) ||
+               m1136_duplex_add(&duplex,&page,last->paper)) {
+                error="Cannot prepare blank final back"; goto done;
+            }
+            m1136_page_destroy(&page);
+        }
+        time_t now=time(NULL); struct tm local; char stamp[15];
+        if(!localtime_r(&now,&local) || strftime(stamp,sizeof stamp,"%Y%m%d%H%M%S",&local)!=14 ||
+           m1136_job_begin_manual(&job,write_output,NULL,stamp) ||
+           m1136_duplex_print(&duplex,&job)) {
+            error="Manual duplex output failed or cancelled"; goto done;
+        }
+    }
     m1136_result result=m1136_job_end(&job);
     if(result) { error=m1136_error(result); goto done; }
     status=0;
 done:
+    if(duplex.fd>=0) close(duplex.fd);
     m1136_page_destroy(&page);
     m1136_raster_close(&raster);
     if(input_flags>=0) (void)fcntl(fd,F_SETFL,input_flags);

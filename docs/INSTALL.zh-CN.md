@@ -97,7 +97,8 @@ lpstat -p HP_M1136_Native_C
 ```
 
 当前输出按页携带份数；逐份排序由上游 CUPS 排版处理，需实机验证。
-仅支持 600dpi、A4/Letter、单面、1–99 份、最多 500 个输入页面。
+单面支持 600dpi、A4/Letter、1–99 份、最多 500 个输入页面。
+开发分支另有[手动双面](MANUAL-DUPLEX.zh-CN.md)，每次 1 份、最多 200 页；1.0.0 稳定版不包含。
 拒绝压缩 CUPS raster 容器；Apple PDF 流程使用未压缩 raster，打印机端仍为 JBIG。
 
 ## 回滚

@@ -11,7 +11,7 @@ for name in ['jbg_dec', 'jbg_newlen', 'system', 'popen', 'execve', 'socket', 'tm
     pattern = r'\b_?' + re.escape(name) + (r'\w*\b' if name.startswith('jbg_') else r'\b')
     if re.search(pattern, symbols):
         raise SystemExit('Forbidden linked symbol: ' + name)
-print('Release filter: decoder/process/network/tempfile symbols absent')
+print('Release filter: decoder/process/network/unsafe tmpfile symbols absent (duplex uses cupsTempFd + unlink)')
 
 if platform.system() == 'Darwin':
     lines = subprocess.check_output(['/usr/bin/otool', '-L', binary], text=True).splitlines()[1:]

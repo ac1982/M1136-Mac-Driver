@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from xqx import page_copies
+from xqx import page_copies, page_items
 
 root = Path(__file__).resolve().parents[1]
 
@@ -85,3 +85,23 @@ with tempfile.TemporaryDirectory(prefix='m1136-pipeline-') as directory:
             accounting = [line for line in result.stderr.decode().splitlines() if line.startswith('PAGE:')]
             assert accounting == [f'PAGE: {i} {n}' for i, n in enumerate(expected, 1)], (label, accounting)
             print(label, 'Apple PDF -> raster -> XQX PASS', actual, 'sheets:', sum(actual))
+
+    for paper, width, height in [('A4',595,842),('Letter',612,792)]:
+        for pages in [3,4]:
+            source.write_bytes(pdf(width,height,pages))
+            for mode in ['LongEdge','ShortEdge']:
+                option='M1136ManualDuplex='+mode
+                rendered=subprocess.run([
+                    '/usr/sbin/cupsfilter','-p',str(root/'ppd/M1136.ppd'),
+                    '-m','application/vnd.cups-raster','-o','PageSize='+paper,
+                    '-o',option,str(source)],capture_output=True,timeout=60)
+                assert rendered.returncode==0,rendered.stderr
+                assert len(raster_pages(rendered.stdout))==pages
+                result=subprocess.run([sys.argv[1],'1','test','manual duplex','1',option],
+                    input=rendered.stdout,capture_output=True,timeout=60)
+                assert result.returncode==0,result.stderr
+                items=page_items(result.stdout)
+                assert len(items)==4
+                assert [p[0x20000012] for p in items]==[0,1,2,3]
+                assert page_copies(result.stdout)==[1,1,1,1]
+                print(paper,pages,mode,'Apple PDF -> manual duplex PASS')

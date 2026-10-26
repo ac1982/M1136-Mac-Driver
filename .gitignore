@@ -2,3 +2,7 @@ build*/
 .DS_Store
 __pycache__/
 *.dSYM/
+
+# Generated local calibration documents and render previews
+/output/pdf/
+/tmp/pdfs/

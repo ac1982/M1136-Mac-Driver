@@ -7,4 +7,8 @@ void m1136_u32(m1136_job *, uint32_t);
 void m1136_record(m1136_job *, uint32_t, uint32_t);
 void m1136_item(m1136_job *, uint32_t, uint32_t);
 m1136_result m1136_encode(m1136_job *, const m1136_page *);
+/* Header/finish also frame trusted, locally encoded duplex spool data. */
+m1136_result m1136_page_header(m1136_job *, const m1136_page *, unsigned, unsigned, int);
+m1136_result m1136_page_finish(m1136_job *);
+m1136_result m1136_job_begin_manual(m1136_job *, m1136_write_fn, void *, const char *);
 #endif

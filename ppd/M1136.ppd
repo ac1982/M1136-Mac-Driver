@@ -1,7 +1,7 @@
 *PPD-Adobe: "4.3"
 *% SPDX-License-Identifier: GPL-2.0-or-later
 *FormatVersion: "4.3"
-*FileVersion: "1.0.0"
+*FileVersion: "1.1.0"
 *LanguageVersion: English
 *LanguageEncoding: ISOLatin1
 *PCFileName: "M1136.PPD"
@@ -45,3 +45,10 @@
 *DefaultResolution: 600dpi
 *Resolution 600dpi/600 dpi: "<</HWResolution[600 600]/cupsBitsPerColor 8/cupsColorSpace 0/cupsColorOrder 0/cupsCompression 0>>setpagedevice"
 *CloseUI: *Resolution
+*OpenUI *M1136ManualDuplex/Manual Duplex (1 copy; reload at H1): PickOne
+*OrderDependency: 30 AnySetup *M1136ManualDuplex
+*DefaultM1136ManualDuplex: Off
+*M1136ManualDuplex Off/Off: ""
+*M1136ManualDuplex LongEdge/Long-edge binding: ""
+*M1136ManualDuplex ShortEdge/Short-edge binding: ""
+*CloseUI: *M1136ManualDuplex

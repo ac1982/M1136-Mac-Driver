@@ -19,8 +19,8 @@ void m1136_record(m1136_job *j, uint32_t type, uint32_t count)
 void m1136_item(m1136_job *j, uint32_t type, uint32_t value)
 { m1136_record(j, type, 4); m1136_u32(j, value); }
 
-m1136_result m1136_job_begin(m1136_job *j, m1136_write_fn write,
-                            void *context, const char *stamp)
+static m1136_result begin(m1136_job *j, m1136_write_fn write,
+                            void *context, const char *stamp, int manual)
 {
     if (!j || !write || !stamp || strlen(stamp) != 14)
         return M1136_INVALID;
@@ -43,25 +43,31 @@ m1136_result m1136_job_begin(m1136_job *j, m1136_write_fn write,
     m1136_item(j, 0x80000000, 84);
     m1136_item(j, 0x10000005, 1);
     m1136_item(j, 0x10000001, 0);
-    m1136_item(j, 0x10000002, 0);
+    m1136_item(j, 0x10000002, manual ? 2 : 0);
     m1136_item(j, 0x10000000, 0);
     m1136_item(j, 0x10000003, 1);
     m1136_item(j, 0x80000001, 0xdeadbeef);
     return j->error;
 }
 
-m1136_result m1136_job_page(m1136_job *j, const m1136_page *p, unsigned paper, unsigned copies)
+m1136_result m1136_job_begin(m1136_job *j, m1136_write_fn w, void *c, const char *stamp)
+{ return begin(j,w,c,stamp,0); }
+m1136_result m1136_job_begin_manual(m1136_job *j, m1136_write_fn w, void *c, const char *stamp)
+{ return begin(j,w,c,stamp,1); }
+
+m1136_result m1136_page_header(m1136_job *j, const m1136_page *p,
+                              unsigned paper, unsigned copies, int pause)
 {
     if (!j || !j->active) return M1136_STATE;
     if (j->error) return j->error;
     if (j->pages >= M1136_MAX_PAGES) return j->error = M1136_STATE;
-    if (copies < 1 || copies > 99 || !p || !p->bits || !p->width || p->width > M1136_MAX_WIDTH ||
+    if (copies < 1 || copies > 99 || pause < -1 || pause > 3 || !p || !p->width || p->width > M1136_MAX_WIDTH ||
         !p->height || p->height > M1136_MAX_HEIGHT ||
         p->stride != ((size_t)p->width + 127) / 128 * 16 ||
         (paper != 1 && paper != 9)) return j->error = M1136_INVALID;
     uint32_t padded = (p->width + 127u) & ~127u;
-    m1136_record(j, 3, 15);
-    m1136_item(j, 0x80000000, 180);
+    m1136_record(j, 3, pause < 0 ? 15 : 16);
+    m1136_item(j, 0x80000000, pause < 0 ? 180 : 192);
     m1136_item(j, 0x20000005, copies);
     m1136_item(j, 0x20000006, 7);
     m1136_item(j, 0x20000000, 1);
@@ -74,10 +80,23 @@ m1136_result m1136_job_page(m1136_job *j, const m1136_page *p, unsigned paper, u
     m1136_item(j, 0x2000000f, p->width);
     m1136_item(j, 0x20000010, p->height);
     m1136_item(j, 0x20000011, 0);
+    if (pause >= 0) m1136_item(j, 0x20000012, (unsigned)pause);
     m1136_item(j, 0x20000001, paper);
     m1136_item(j, 0x80000001, 0xdeadbeef);
-    if (j->error) return j->error;
+    return j->error;
+}
+
+m1136_result m1136_job_page(m1136_job *j, const m1136_page *p, unsigned paper, unsigned copies)
+{
+    if (!p || !p->bits) return M1136_INVALID;
+    m1136_result result=m1136_page_header(j,p,paper,copies,-1);
+    if (result) return result;
     j->error = m1136_encode(j, p);
+    return m1136_page_finish(j);
+}
+
+m1136_result m1136_page_finish(m1136_job *j)
+{
     m1136_record(j, 4, 0);
     if (!j->error) ++j->pages;
     return j->error;

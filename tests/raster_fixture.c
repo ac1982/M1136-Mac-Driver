@@ -35,8 +35,12 @@ int main(int argc,char **argv)
     if(!strcmp(mode,"paper")) h.PageSize[0]=1;
     if(!strcmp(mode,"bits")) h.cupsBitsPerColor=1;
     unsigned pages=(!strcmp(mode,"multi") || !strcmp(mode,"collated") || !strcmp(mode,"mixedcopies"))?3:!strcmp(mode,"limit")?500:!strcmp(mode,"overlimit")?501:1;
+    if(!strncmp(mode,"duplex",6) && mode[6]>='0' && mode[6]<='9') pages=(unsigned)atoi(mode+6);
+    if(!strcmp(mode,"mixedpaper") || !strcmp(mode,"mixedsize")) pages=2;
     unsigned char row[8192];
     for(unsigned p=0;p<pages;++p) {
+        if(p && !strcmp(mode,"mixedpaper")) {h.PageSize[0]=612;h.PageSize[1]=792;}
+        if(p && !strcmp(mode,"mixedsize")) h.cupsWidth=128;
         if(!strcmp(mode,"mixedcopies")) h.NumCopies=p+1;
         if(fwrite(&h,sizeof h,1,stdout)!=1) return 2;
         if(!strcmp(mode,"truncated")) break;
