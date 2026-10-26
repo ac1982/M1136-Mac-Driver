@@ -1,0 +1,27 @@
+name: Native C validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos-arm64:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Record host version
+        run: |
+          sw_vers
+          uname -m
+          /usr/bin/clang --version
+      - name: Native release, signature, PPD and Apple PDF pipeline
+        run: sh scripts/build-macos.sh
+      - name: Address and undefined behavior sanitizers
+        run: |
+          cmake -S . -B build-sanitize -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_OSX_ARCHITECTURES=arm64 -DM1136_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build-sanitize --parallel 4
+          ctest --test-dir build-sanitize --output-on-failure
