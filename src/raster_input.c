@@ -83,6 +83,8 @@ int m1136_raster_next(m1136_raster *r, cups_page_header2_t *h, unsigned *paper)
        FIELD(r,cupsColorSpace)!=CUPS_CSPACE_W || FIELD(r,Duplex) || FIELD(r,Tumble)) {
         r->error="Expected bounded 600dpi, 8-bit white grayscale, simplex raster";return -1;
     }
+    unsigned copies=FIELD(r,NumCopies);
+    if(copies<1 || copies>99) {r->error="Raster NumCopies must be 1..99";return -1;}
     unsigned pw=FIELD(r,PageSize[0]),ph=FIELD(r,PageSize[1]);
     if(pw==595 && ph==842) *paper=9;
     else if(pw==612 && ph==792) *paper=1;

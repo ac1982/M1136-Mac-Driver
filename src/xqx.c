@@ -20,13 +20,13 @@ void m1136_item(m1136_job *j, uint32_t type, uint32_t value)
 { m1136_record(j, type, 4); m1136_u32(j, value); }
 
 m1136_result m1136_job_begin(m1136_job *j, m1136_write_fn write,
-                            void *context, unsigned copies, const char *stamp)
+                            void *context, const char *stamp)
 {
-    if (!j || !write || copies < 1 || copies > 99 || !stamp || strlen(stamp) != 14)
+    if (!j || !write || !stamp || strlen(stamp) != 14)
         return M1136_INVALID;
     for (unsigned i = 0; i < 14; ++i)
         if (stamp[i] < '0' || stamp[i] > '9') return M1136_INVALID;
-    *j = (m1136_job){write, context, copies, 0, 1, M1136_OK};
+    *j = (m1136_job){write, context, 0, 1, M1136_OK};
     char pjl[512];
     int n = snprintf(pjl, sizeof pjl,
         "\033%%-12345X@PJL JOB\n"
@@ -50,19 +50,19 @@ m1136_result m1136_job_begin(m1136_job *j, m1136_write_fn write,
     return j->error;
 }
 
-m1136_result m1136_job_page(m1136_job *j, const m1136_page *p, unsigned paper)
+m1136_result m1136_job_page(m1136_job *j, const m1136_page *p, unsigned paper, unsigned copies)
 {
     if (!j || !j->active) return M1136_STATE;
     if (j->error) return j->error;
     if (j->pages >= M1136_MAX_PAGES) return j->error = M1136_STATE;
-    if (!p || !p->bits || !p->width || p->width > M1136_MAX_WIDTH ||
+    if (copies < 1 || copies > 99 || !p || !p->bits || !p->width || p->width > M1136_MAX_WIDTH ||
         !p->height || p->height > M1136_MAX_HEIGHT ||
         p->stride != ((size_t)p->width + 127) / 128 * 16 ||
         (paper != 1 && paper != 9)) return j->error = M1136_INVALID;
     uint32_t padded = (p->width + 127u) & ~127u;
     m1136_record(j, 3, 15);
     m1136_item(j, 0x80000000, 180);
-    m1136_item(j, 0x20000005, j->copies);
+    m1136_item(j, 0x20000005, copies);
     m1136_item(j, 0x20000006, 7);
     m1136_item(j, 0x20000000, 1);
     m1136_item(j, 0x20000007, 1);

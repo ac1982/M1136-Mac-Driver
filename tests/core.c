@@ -95,28 +95,34 @@ int main(void)
     CHECK(black==8);
     sink s={0}; m1136_job j={0};
     CHECK(m1136_job_end(&j)==M1136_STATE);
-    CHECK(m1136_job_begin(&j,write_memory,&s,0,"20261026000000")==M1136_INVALID);
-    CHECK(m1136_job_begin(&j,write_memory,&s,1,"PJL injection!")==M1136_INVALID);
-    CHECK(!m1136_job_begin(&j,write_memory,&s,2,"20261026000000"));
-    CHECK(!m1136_job_page(&j,&p,9)); CHECK(!m1136_job_end(&j)); roundtrip(&s,&p);
+    CHECK(m1136_job_begin(&j,write_memory,&s,"PJL injection!")==M1136_INVALID);
+    CHECK(!m1136_job_begin(&j,write_memory,&s,"20261026000000"));
+    CHECK(!m1136_job_page(&j,&p,9,2)); CHECK(!m1136_job_end(&j)); roundtrip(&s,&p);
     size_t calls=s.calls; free(s.data);
     for(size_t fail=1;fail<=calls;++fail) {
         s=(sink){.fail=fail};
-        m1136_result r=m1136_job_begin(&j,write_memory,&s,2,"20261026000000");
-        if(!r) r=m1136_job_page(&j,&p,9);
+        m1136_result r=m1136_job_begin(&j,write_memory,&s,"20261026000000");
+        if(!r) r=m1136_job_page(&j,&p,9,2);
         if(!r) r=m1136_job_end(&j);
         CHECK(r==M1136_OUTPUT && s.calls==fail);
         free(s.data);
     }
-    s=(sink){0}; CHECK(!m1136_job_begin(&j,write_memory,&s,1,"20261026000000"));
-    j.pages=500; CHECK(m1136_job_page(&j,&p,9)==M1136_STATE); free(s.data);
+    s=(sink){0}; CHECK(!m1136_job_begin(&j,write_memory,&s,"20261026000000"));
+    j.pages=500; CHECK(m1136_job_page(&j,&p,9,2)==M1136_STATE); free(s.data);
+    for(unsigned copies=0; copies<=100; copies+=100) {
+        s=(sink){0}; CHECK(!m1136_job_begin(&j,write_memory,&s,"20261026000000"));
+        size_t before=s.size;
+        CHECK(m1136_job_page(&j,&p,9,copies)==M1136_INVALID && s.size==before);
+        CHECK(m1136_job_end(&j)==M1136_INVALID);
+        free(s.data);
+    }
     m1136_page_destroy(&p);
     /* Deterministic noisy image: crosses multiple 64 KiB chunks. */
     CHECK(!m1136_page_create(&p,1025,1024));
     uint32_t seed=17;
     for(size_t i=0;i<p.stride*p.height;++i) { seed=seed*1664525u+1013904223u; p.bits[i]=(unsigned char)(seed>>24); }
-    s=(sink){0}; CHECK(!m1136_job_begin(&j,write_memory,&s,99,"20261026000000"));
-    CHECK(!m1136_job_page(&j,&p,1)); CHECK(!m1136_job_end(&j)); roundtrip(&s,&p);
+    s=(sink){0}; CHECK(!m1136_job_begin(&j,write_memory,&s,"20261026000000"));
+    CHECK(!m1136_job_page(&j,&p,1,99)); CHECK(!m1136_job_end(&j)); roundtrip(&s,&p);
     free(s.data); m1136_page_destroy(&p);
     puts("core: dithering, geometry, state, every-write failures, XQX and JBIG roundtrip PASS");
     return 0;

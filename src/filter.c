@@ -94,12 +94,13 @@ int main(int argc, char **argv)
             if(!localtime_r(&now,&local) || strftime(stamp,sizeof stamp,"%Y%m%d%H%M%S",&local)!=14) {
                 error="Cannot format job timestamp"; goto done;
             }
-            result=m1136_job_begin(&job,write_output,NULL,copies,stamp);
+            result=m1136_job_begin(&job,write_output,NULL,stamp);
             if(result) { error=m1136_error(result); goto done; }
         }
-        result=m1136_job_page(&job,&page,paper);
+        /* The renderer may expand collated copies; argv[4] is not the per-page copy count. */
+        result=m1136_job_page(&job,&page,paper,header.NumCopies);
         if(result) { error=m1136_error(result); goto done; }
-        fprintf(stderr,"PAGE: %u %u\n",job.pages,copies);
+        fprintf(stderr,"PAGE: %u %u\n",job.pages,header.NumCopies);
         m1136_page_destroy(&page);
     }
     if(cancelled) { error="Job cancelled"; goto done; }

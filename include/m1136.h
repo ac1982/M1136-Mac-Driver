@@ -18,15 +18,15 @@ typedef struct {
 typedef struct {
     m1136_write_fn write;
     void *context;
-    unsigned copies, pages;
+    unsigned pages;
     int active;
     m1136_result error;
 } m1136_job;
 m1136_result m1136_page_create(m1136_page *, uint32_t, uint32_t);
 m1136_result m1136_page_row(m1136_page *, uint32_t, const unsigned char *, size_t);
 void m1136_page_destroy(m1136_page *);
-m1136_result m1136_job_begin(m1136_job *, m1136_write_fn, void *, unsigned, const char *);
-m1136_result m1136_job_page(m1136_job *, const m1136_page *, unsigned);
+m1136_result m1136_job_begin(m1136_job *, m1136_write_fn, void *, const char *);
+m1136_result m1136_job_page(m1136_job *, const m1136_page *, unsigned paper, unsigned copies);
 m1136_result m1136_job_end(m1136_job *);
 const char *m1136_error(m1136_result);
 #endif

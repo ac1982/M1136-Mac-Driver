@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from xqx import page_items, page_copies
 
 binary, fixture = map(str, map(Path, sys.argv[1:3]))
 def run(data, copies='1', path=None, ok=False):
@@ -20,20 +21,7 @@ def run(data, copies='1', path=None, ok=False):
     return p
 
 def page_count(data):
-    pos=data.index(b',XQX')+4
-    pages=0
-    while True:
-        kind,count=struct.unpack_from('>II',data,pos);pos+=8
-        assert 1<=kind<=7
-        if kind==7: pos+=count
-        else:
-            for _ in range(count):
-                key,n=struct.unpack_from('>II',data,pos);pos+=8+n
-        assert pos<=len(data)
-        if kind==3: pages+=1
-        if kind==2: break
-    assert data[pos:]==b'\x1b%-12345X@PJL EOJ\n\x1b%-12345X'
-    return pages
+    return len(page_items(data))
 
 valid=None
 for case in ['valid','a4','letter','max','multi','limit']:
@@ -46,6 +34,17 @@ for case in ['width','height','stride','color','duplex','tumble','dpi','paper','
     data=subprocess.check_output([fixture,case],timeout=30)
     run(data)
     print(case,'rejected')
+# Raster metadata is authoritative even when argv[4] still requests 3 copies.
+for case, expected in [('collated',[1,1,1]), ('uncollated',[3]),
+                       ('mixedcopies',[1,2,3]), ('copies99',[99])]:
+    data=subprocess.check_output([fixture,case],timeout=30)
+    p=run(data,copies='3',ok=True)
+    assert page_copies(p.stdout)==expected,(case,page_copies(p.stdout))
+    accounting=[line for line in p.stderr.decode().splitlines() if line.startswith('PAGE:')]
+    assert accounting==[f'PAGE: {i} {n}' for i,n in enumerate(expected,1)],accounting
+    print(case,'copies and accounting PASS',expected)
+for case in ['copies0','copies100','copiesoverflow']:
+    assert not run(subprocess.check_output([fixture,case])).stdout
 for copies in ['0','100','-1','+1',' 1','1 ','1;touch /tmp/no','999999999999999999999999','']:
     assert not run(valid,copies).stdout
 for copies in ['1','99']:
