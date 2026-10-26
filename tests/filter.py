@@ -52,6 +52,19 @@ for copies in ['1','99']:
     assert page_count(run(valid,copies,ok=True).stdout)==1
 for data in [b'',b'not raster',valid[:3],valid[:50],valid[:-1],valid+b'broken next header']:
     run(data)
+# Both endian variants and legacy v1 framing must decode to the same stream.
+v1=(0x52615374).to_bytes(4,sys.byteorder)+valid[4:424]+valid[1800:]
+assert page_count(run(v1,ok=True).stdout)==1
+swapped=bytearray(valid)
+swapped[:4]=swapped[:4][::-1]
+for offset in range(4+256,4+580,4): swapped[offset:offset+4]=swapped[offset:offset+4][::-1]
+assert page_count(run(bytes(swapped),ok=True).stdout)==1
+for offset in [372,376,392]:
+    malformed=bytearray(valid)
+    malformed[4+offset:8+offset]=(0xffffffff).to_bytes(4,sys.byteorder)
+    assert not run(bytes(malformed)).stdout
+# Compressed raster containers are deliberately outside this version's input contract.
+run((0x52615332).to_bytes(4,sys.byteorder)+valid[4:])
 with tempfile.TemporaryDirectory() as d:
     d=Path(d); path=d/'input.ras'; path.write_bytes(valid)
     run(None,path=path,ok=True)
